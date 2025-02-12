@@ -2,7 +2,9 @@ package tn.esprit.spring.firstms.ServiceImpl;
 
 import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 import tn.esprit.spring.firstms.Entities.Product;
 import tn.esprit.spring.firstms.Entities.ProductMapper;
 import tn.esprit.spring.firstms.Entities.Status;
@@ -22,6 +24,7 @@ public class ProductImpl implements IProductService {
     final ProductRepository productRepository;
     final ProductMapper productMapper; //for DTO conversion
     final InventoryClient inventoryClient;
+    final CircuitBreakerFactory circuitBreakerFactory;
 
 
     @Override
@@ -74,7 +77,7 @@ public class ProductImpl implements IProductService {
     @Override
     public ProductDTO getProductDetails(String code, Status status) {
         Product product = productRepository.findByCodeAndStatus(code, status).orElseThrow(() -> new RuntimeException("Product not found with code: " + code));
-        InventoryDTO inventoryDTO = inventoryClient.retrieveByCode(code);
+        InventoryDTO inventoryDTO = circuitBreakerFactory.create("inventoryService").run(() -> inventoryClient.retrieveByCode(code), throwable -> new InventoryDTO(product.getCode(), product.getCode(), 0));
         ProductDTO productDTO = new ProductDTO(product.getId(), product.getLabel(), product.getPrice(), inventoryDTO.quantity());
         return productDTO;
     }
